@@ -51,5 +51,9 @@ async def get_project(
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    # RBAC: ensure user is member (simple check)
+    mem = await session.execute(select(ProjectMember).where(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id))
+    if not mem.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return ProjectOut(id=project.id, name=project.name, description=project.description, created_by=project.created_by)
 

@@ -15,6 +15,11 @@ spec:
       containers:
         - name: backend
           image: your-org/ai-bom-backend:latest
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -28,4 +33,16 @@ spec:
                   key: secret_key
           ports:
             - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
 

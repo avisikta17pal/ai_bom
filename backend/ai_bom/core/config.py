@@ -32,11 +32,15 @@ class Settings(BaseSettings):
 
     s3: S3Settings = Field(default_factory=S3Settings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])  # tighten in prod
 
     admin_email: str = Field(default="admin@example.com")
     admin_password: str = Field(default="admin123")
 
     allow_dataset_uploads: bool = Field(default=False)
+    require_https: bool = Field(default=False)
+    hsts_max_age: int = Field(default=31536000)
+    csp_policy: str = Field(default="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'")
 
     prometheus_namespace: str = Field(default="ai_bom")
 

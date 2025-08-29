@@ -12,6 +12,7 @@ from ai_bom.core.security import get_current_user
 from ai_bom.db.models import BOM, BOMVersion, Project, User
 from ai_bom.db.session import get_session
 from ai_bom.services.exporter import export_bom
+from ai_bom.services.storage import presign_put
 
 
 router = APIRouter()
@@ -140,4 +141,9 @@ async def export_bom_endpoint(
     }
     out_path = export_bom(bom, format)
     return {"path": out_path}
+
+
+@router.post("/projects/{project_id}/uploads/presign")
+async def create_presigned_upload(project_id: str, key: str) -> Any:
+    return presign_put(f"{project_id}/{key}")
 

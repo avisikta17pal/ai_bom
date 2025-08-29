@@ -10,18 +10,30 @@ import typer
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
-from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 
 from ai_bom.__init__ import __version__
 from ai_bom.core.config import Settings, get_settings
-from ai_bom.db.session import get_session, init_models
+from ai_bom.db.session import get_session
 from ai_bom.api.v1.auth import router as auth_router
 from ai_bom.api.v1.projects import router as projects_router
 from ai_bom.api.v1.boms import router as boms_router
 from ai_bom.api.v1.webhook import router as webhook_router
 from ai_bom.api.v1.mappings import router as mappings_router
 from ai_bom.api.v1.scan import router as scan_router
+from ai_bom.core.logging import configure_logging
+from ai_bom.core.config import get_settings
+import structlog
+import time
+import redis
 
 
 metrics_registry = CollectorRegistry()
@@ -40,19 +52,71 @@ bom_signed_total = Counter(
     "Total number of BOMs signed",
     registry=metrics_registry,
 )
+request_latency_seconds = Histogram(
+    "api_request_latency_seconds",
+    "API request latency in seconds",
+    registry=metrics_registry,
+)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: FastAPI, redis_client: redis.Redis, rpm: int) -> None:
+        super().__init__(app)
+        self.redis = redis_client
+        self.rpm = rpm
+
+    async def dispatch(self, request, call_next):  # type: ignore[no-untyped-def]
+        key = f"rl:{request.client.host}:{int(time.time() // 60)}"
+        try:
+            count = self.redis.incr(key)
+            if count == 1:
+                self.redis.expire(key, 60)
+            if count > self.rpm:
+                return JSONResponse({"detail": "Rate limit exceeded"}, status_code=429)
+        except Exception:
+            pass
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration = time.perf_counter() - start
+        request_latency_seconds.observe(duration)
+        return response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: FastAPI, settings: Settings):
+        super().__init__(app)
+        self.settings = settings
+
+    async def dispatch(self, request, call_next):  # type: ignore[no-untyped-def]
+        response = await call_next(request)
+        if self.settings.require_https:
+            response.headers["Strict-Transport-Security"] = f"max-age={self.settings.hsts_max_age}; includeSubDomains"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = self.settings.csp_policy
+        return response
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    configure_logging()
+    log = structlog.get_logger()
     app = FastAPI(title="ai-bom", version=__version__, openapi_url="/openapi.json")
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    try:
+        r = redis.Redis.from_url(settings.redis_url)
+        app.add_middleware(RateLimitMiddleware, redis_client=r, rpm=120)
+    except Exception:
+        log.warning("rate_limit_disabled", reason="redis unavailable")
 
     @app.middleware("http")
     async def add_metrics(request, call_next):  # type: ignore[no-untyped-def]
@@ -79,8 +143,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.on_event("startup")
     async def on_startup() -> None:  # pragma: no cover - side effects
-        if settings.environment != "production":
-            await init_models()
+        # Initialize tracing lazily
+        try:
+            from opentelemetry import trace
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.resources import Resource
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+            from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+            resource = Resource.create({"service.name": "ai-bom-backend"})
+            provider = TracerProvider(resource=resource)
+            processor = BatchSpanProcessor(OTLPSpanExporter())
+            provider.add_span_processor(processor)
+            trace.set_tracer_provider(provider)
+            FastAPIInstrumentor.instrument_app(app)
+        except Exception:
+            pass
 
     return app
 

@@ -3,7 +3,6 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from ai_bom.core.config import get_settings
-from ai_bom.db.base import Base
 
 
 settings = get_settings()
@@ -19,6 +18,6 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_models() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Deprecated: use Alembic migrations instead of create_all
+    return None
 

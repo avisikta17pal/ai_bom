@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim as base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -11,6 +11,10 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ai_bom ./ai_bom
+
+# Create non-root user
+RUN useradd -u 10001 -m appuser && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8000
 

@@ -20,6 +20,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 def get_password_hash(password: str) -> str:
+    _validate_password_policy(password)
     return pwd_hasher.hash(password)
 
 
@@ -56,4 +57,13 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+def _validate_password_policy(password: str) -> None:
+    if len(password) < 12:
+        raise ValueError("Password must be at least 12 characters")
+    if password.lower() == password or password.upper() == password:
+        pass  # allow but encourage mixed case
+    if password.isdigit() or password.isalpha():
+        raise ValueError("Password must include both letters and numbers or symbols")
 

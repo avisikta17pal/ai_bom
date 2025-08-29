@@ -37,7 +37,7 @@ jobs:
       - name: Lint
         run: |
           pip install ruff black isort
-          ruff backend
+          ruff check backend
           black --check backend
           isort --check-only backend
       - name: Run backend tests

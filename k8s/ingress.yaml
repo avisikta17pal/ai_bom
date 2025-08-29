@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-bom
+spec:
+  tls:
+    - hosts:
+        - ai-bom.example.com
+      secretName: ai-bom-tls
+  rules:
+    - host: ai-bom.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-bom-backend
+                port:
+                  number: 80
+

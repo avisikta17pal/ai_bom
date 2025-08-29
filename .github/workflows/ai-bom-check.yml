@@ -1,0 +1,22 @@
+name: ai-bom deploy check
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install ai-bom
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          echo "from ai_bom.cli import app; app" > /tmp/entry.py
+      - name: Run ai-bom deploy-check
+        run: |
+          python -m ai_bom.cli deploy-check || (echo "ai-bom deploy check failed" && exit 1)
+

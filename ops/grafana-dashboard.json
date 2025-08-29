@@ -1,0 +1,9 @@
+{
+  "title": "AI-BOM Metrics",
+  "panels": [
+    {"type": "stat", "title": "API Requests", "targets": [{"expr": "api_request_count"}]},
+    {"type": "stat", "title": "BOM Created", "targets": [{"expr": "bom_created_total"}]},
+    {"type": "stat", "title": "BOM Signed", "targets": [{"expr": "bom_signed_total"}]}
+  ]
+}
+

@@ -1,0 +1,23 @@
+name: 'ai-bom deploy check'
+description: 'Run ai-bom CLI to ensure BOM presence and signatures'
+inputs:
+  working-directory:
+    description: 'Directory to run the check from'
+    required: false
+    default: '.'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install ai-bom deps
+      shell: bash
+      run: |
+        pip install -r backend/requirements.txt
+    - name: Run deploy-check
+      shell: bash
+      run: |
+        cd ${{ inputs.working-directory }}
+        python -m ai_bom.cli deploy-check
+

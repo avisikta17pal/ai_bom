@@ -1,0 +1,7 @@
+image:
+  repository: your-org/ai-bom-backend
+  tag: latest
+service:
+  type: ClusterIP
+  port: 80
+

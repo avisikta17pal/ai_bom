@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ai-bom
+description: AI-BOM backend Helm chart
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+

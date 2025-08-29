@@ -94,8 +94,8 @@ jobs:
 - JWT secrets rotate via `SECRET_KEY`. Use HTTPS and secure cookies in production. Set `require_https=true` and configure ingress TLS.
 - CORS tightened via `cors_origins`. Configure to your frontend domain.
 - Security headers: HSTS, CSP, X-Frame-Options, X-Content-Type-Options.
-- Rate limiting via Redis; Prometheus metrics and OpenTelemetry tracing enabled.
-- S3 MinIO uploads use SSE (AES256) and presigned URLs.
+- Rate limiting via Redis; Prometheus metrics and OpenTelemetry tracing enabled. Request/trace IDs included in logs.
+- S3 uploads/downloads: presigned PUT/GET, multipart uploads, size/type limits, SSE (AES256 or KMS if `S3_KMS_KEY_ID` set), lifecycle policies.
 - Alembic migrations manage schema; audit logs are append-only via DB trigger.
 - CI adds coverage gate, Bandit SAST, Trivy image scan; Dependabot keeps dependencies current.
 
@@ -112,6 +112,51 @@ jobs:
 See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
 ### Roadmap
+### Operations & observability
+
+- Structured JSON logs (request_id, optional trace_id)
+- Prometheus metrics: request counts and latency histogram
+- OpenTelemetry tracing: set `OTLP_ENDPOINT` to enable export
+- Dashboards/alerts: sample Grafana dashboard in `ops/grafana-dashboard.json`
+
+### CI/CD & security hardening
+
+- Coverage gate: backend `pytest --cov-fail-under=70`, frontend `jest --coverage`
+- Bandit SAST, Trivy image scan (fails on HIGH/CRITICAL), SBOM via Syft
+- Alembic migrations run during CI; ensure `alembic upgrade head` on deploy
+
+### Kubernetes hardening
+
+- Non-root, read-only root filesystem, seccomp `RuntimeDefault`
+- Probes: `/health` readiness/liveness
+- Resources: cpu/memory requests/limits set; HPA provided
+- NetworkPolicy example and separate worker Deployment
+- TLS Ingress manifest; set `require_https=true` and configure cert-manager/ACME
+
+### RBAC & auth
+
+- JWT auth with Argon2 password hashing
+- RBAC enforced on project and BOM operations; roles: owner, editor, viewer
+- Password policy enforced at signup/reset; SSO placeholder documented
+
+### Webhook verification
+
+- GitHub webhook signature verified using raw request body (`X-Hub-Signature-256`)
+
+### S3 security & lifecycle
+
+- SSE: AES256 by default; KMS when `S3_KMS_KEY_ID` is provided
+- Bucket policy and lifecycle helper: `scripts/s3_setup_policy_lifecycle.py`
+- Upload size/type limits via config; multipart upload support
+
+### Deployment
+
+1. Set environment variables (`.env`) including `SECRET_KEY`, `OTLP_ENDPOINT`, S3, DB, Redis
+2. Apply DB migrations: `alembic upgrade head`
+3. Configure S3 bucket policy/lifecycle: `python scripts/s3_setup_policy_lifecycle.py`
+4. Deploy K8s manifests (backend, worker, service, ingress, hpa, networkpolicy)
+5. Set `cors_origins` to your frontend domains; set `require_https=true`
+
 
 See `ROADMAP.md` for the 4-week plan and stretch goals.
 

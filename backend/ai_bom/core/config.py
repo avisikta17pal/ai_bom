@@ -17,6 +17,7 @@ class S3Settings(BaseModel):
     secret_key: str = Field(default="minioadmin")
     bucket: str = Field(default="ai-bom")
     secure: bool = Field(default=False)
+    kms_key_id: str | None = Field(default=None)
 
 
 class Settings(BaseSettings):
@@ -41,8 +42,11 @@ class Settings(BaseSettings):
     require_https: bool = Field(default=False)
     hsts_max_age: int = Field(default=31536000)
     csp_policy: str = Field(default="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'")
+    max_upload_mb: int = Field(default=512)
+    allowed_upload_mime_types: list[str] = Field(default_factory=lambda: ["application/octet-stream", "application/x-hdf5", "application/zip", "text/csv"])
 
     prometheus_namespace: str = Field(default="ai_bom")
+    otlp_endpoint: str | None = Field(default=None)
 
 
 @lru_cache(maxsize=1)

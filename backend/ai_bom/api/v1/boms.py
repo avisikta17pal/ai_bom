@@ -13,7 +13,13 @@ from ai_bom.core.rbac import require_project_role
 from ai_bom.db.models import BOM, BOMVersion, Project, User
 from ai_bom.db.session import get_session
 from ai_bom.services.exporter import export_bom
-from ai_bom.services.storage import presign_put
+from ai_bom.services.storage import (
+    presign_put,
+    presign_get,
+    create_multipart_upload,
+    presign_upload_part,
+    complete_multipart_upload,
+)
 from ai_bom.services.audit import write_audit_log
 
 
@@ -149,7 +155,38 @@ async def export_bom_endpoint(
 
 
 @router.post("/projects/{project_id}/uploads/presign")
-async def create_presigned_upload(project_id: str, key: str, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
+async def create_presigned_upload(project_id: str, key: str, mime: str | None = None, size_bytes: int | None = None, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
     await require_project_role(project_id, ["owner", "editor"], session=session, user=user)
+    from ai_bom.core.config import get_settings
+
+    settings = get_settings()
+    if size_bytes and size_bytes > settings.max_upload_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large")
+    if mime and mime not in settings.allowed_upload_mime_types:
+        raise HTTPException(status_code=415, detail="Unsupported media type")
     return presign_put(f"{project_id}/{key}")
+
+
+@router.get("/projects/{project_id}/downloads/presign")
+async def create_presigned_download(project_id: str, key: str, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
+    await require_project_role(project_id, ["owner", "editor", "viewer"], session=session, user=user)
+    return presign_get(f"{project_id}/{key}")
+
+
+@router.post("/projects/{project_id}/uploads/multipart/init")
+async def multipart_init(project_id: str, key: str, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
+    await require_project_role(project_id, ["owner", "editor"], session=session, user=user)
+    return create_multipart_upload(f"{project_id}/{key}")
+
+
+@router.get("/projects/{project_id}/uploads/multipart/part")
+async def multipart_presign_part(project_id: str, key: str, upload_id: str, part_number: int, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
+    await require_project_role(project_id, ["owner", "editor"], session=session, user=user)
+    return presign_upload_part(f"{project_id}/{key}", upload_id, part_number)
+
+
+@router.post("/projects/{project_id}/uploads/multipart/complete")
+async def multipart_complete(project_id: str, key: str, upload_id: str, parts: list[dict], user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
+    await require_project_role(project_id, ["owner", "editor"], session=session, user=user)
+    return complete_multipart_upload(f"{project_id}/{key}", upload_id, parts)
 

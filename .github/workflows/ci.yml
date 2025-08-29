@@ -40,6 +40,12 @@ jobs:
           ruff check backend
           black --check backend
           isort --check-only backend
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ai_bom
+        run: |
+          cd backend
+          alembic upgrade head
       - name: Run backend tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ai_bom
@@ -80,12 +86,6 @@ jobs:
         with:
           name: sbom-spdx
           path: sbom.spdx.json
-      - name: Run Alembic migrations
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ai_bom
-        run: |
-          cd backend
-          alembic upgrade head
 
   frontend:
     runs-on: ubuntu-latest

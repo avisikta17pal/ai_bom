@@ -69,7 +69,7 @@ jobs:
         run: |
           docker build -t ai-bom-backend-ci -f backend/Dockerfile backend
       - name: Trivy scan backend image (fail on HIGH)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           image-ref: 'ai-bom-backend-ci'
           format: 'table'

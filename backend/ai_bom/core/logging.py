@@ -6,6 +6,9 @@ import uuid
 from typing import Any
 
 import structlog
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.types import ASGIApp
 
 
 def configure_logging() -> None:
@@ -24,4 +27,20 @@ def configure_logging() -> None:
 
 def get_request_id() -> str:
     return str(uuid.uuid4())
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        rid = get_request_id()
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=rid)
+        try:
+            response = await call_next(request)
+        finally:
+            structlog.contextvars.clear_contextvars()
+        response.headers["X-Request-ID"] = rid
+        return response
 

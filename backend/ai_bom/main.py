@@ -29,7 +29,7 @@ from ai_bom.api.v1.boms import router as boms_router
 from ai_bom.api.v1.webhook import router as webhook_router
 from ai_bom.api.v1.mappings import router as mappings_router
 from ai_bom.api.v1.scan import router as scan_router
-from ai_bom.core.logging import configure_logging
+from ai_bom.core.logging import configure_logging, RequestContextMiddleware
 from ai_bom.core.config import get_settings
 import structlog
 import time
@@ -103,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     log = structlog.get_logger()
     app = FastAPI(title="ai-bom", version=__version__, openapi_url="/openapi.json")
+    app.add_middleware(RequestContextMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

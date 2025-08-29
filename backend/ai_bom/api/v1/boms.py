@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_bom.core.security import get_current_user
+from ai_bom.core.rbac import require_project_role
 from ai_bom.db.models import BOM, BOMVersion, Project, User
 from ai_bom.db.session import get_session
 from ai_bom.services.exporter import export_bom
@@ -67,7 +68,9 @@ async def create_bom(
     data: BOMIn,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
+    _: User = Depends(lambda project_id=Depends(lambda: None): None),
 ) -> Any:
+    await require_project_role(project_id, ["owner", "editor"], session=session, user=user)
     result = await session.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
@@ -146,6 +149,7 @@ async def export_bom_endpoint(
 
 
 @router.post("/projects/{project_id}/uploads/presign")
-async def create_presigned_upload(project_id: str, key: str) -> Any:
+async def create_presigned_upload(project_id: str, key: str, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> Any:
+    await require_project_role(project_id, ["owner", "editor"], session=session, user=user)
     return presign_put(f"{project_id}/{key}")
 

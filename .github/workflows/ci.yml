@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: docker/setup-buildx-action@v3
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -48,7 +49,7 @@ jobs:
           TESTING: "1"
         run: |
           cd backend
-          pytest --cov=ai_bom --cov-report=xml
+          pytest --cov=ai_bom --cov-report=xml --cov-fail-under=70
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
@@ -58,13 +59,33 @@ jobs:
         run: |
           pip install bandit
           bandit -q -r backend -ll
-      - name: Trivy scan backend image
+      - name: Build backend image (for scanning)
+        run: |
+          docker build -t ai-bom-backend-ci -f backend/Dockerfile backend
+      - name: Trivy scan backend image (fail on HIGH)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: 'ghcr.io/your-org/ai-bom-backend:ci'
+          image-ref: 'ai-bom-backend-ci'
           format: 'table'
-          exit-code: '0'
+          exit-code: '1'
           ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+      - name: Generate SBOM (SPDX) with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: ai-bom-backend-ci
+          output-file: sbom.spdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-spdx
+          path: sbom.spdx.json
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ai_bom
+        run: |
+          cd backend
+          alembic upgrade head
 
   frontend:
     runs-on: ubuntu-latest
@@ -81,5 +102,5 @@ jobs:
       - name: Lint and Test
         run: |
           npm run lint --if-present
-          npm test --if-present
+          npm test --if-present -- --coverage
 

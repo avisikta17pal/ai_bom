@@ -34,3 +34,36 @@ async def login(data: LoginRequest, session: AsyncSession = Depends(get_session)
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
 
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@router.post("/signup", response_model=TokenResponse, responses={400: {"description": "Already exists"}})
+async def signup(data: SignupRequest, session: AsyncSession = Depends(get_session)) -> Any:
+    exists = await session.execute(select(User).where(User.email == data.email))
+    if exists.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User exists")
+    user = User(email=data.email, password_hash=get_password_hash(data.password))
+    session.add(user)
+    await session.commit()
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token)
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, session: AsyncSession = Depends(get_session)) -> Any:
+    result = await session.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.password_hash = get_password_hash(data.new_password)
+    await session.commit()
+    return {"status": "ok"}
+

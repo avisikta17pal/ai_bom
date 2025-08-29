@@ -7,6 +7,7 @@ from typing import Any
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
 
 from ai_bom.compliance.mapping import COMPLIANCE_MAPPING, build_compliance_report
 
@@ -55,26 +56,46 @@ def export_bom(bom: dict[str, Any], format: str = "json") -> str:  # noqa: A002 
 def _export_pdf(bom: dict[str, Any], path: str) -> None:
     c = canvas.Canvas(path, pagesize=letter)
     width, height = letter
-    y = height - 50
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, y, f"AI-BOM Technical File: {bom['name']} v{bom['version']}")
-    y -= 30
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, f"Created at: {bom.get('created_at', '')}")
-    y -= 20
-    c.drawString(50, y, f"Description: {bom.get('description', '')[:80]}")
-    y -= 30
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "Components:")
-    c.setFont("Helvetica", 9)
-    y -= 15
-    for comp in bom.get("components", [])[:20]:
-        text = f"- {comp.get('type')} {comp.get('name')} {comp.get('fingerprint', {}).get('hash', '')[:12]}"
-        c.drawString(60, y, text)
-        y -= 12
-        if y < 80:
+    margin = 0.75 * inch
+    y = height - margin
+
+    def header(title: str) -> None:
+        nonlocal y
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(margin, y, title)
+        y -= 0.3 * inch
+
+    def section(title: str) -> None:
+        nonlocal y
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(margin, y, title)
+        y -= 0.2 * inch
+        c.setFont("Helvetica", 10)
+
+    def line(text: str) -> None:
+        nonlocal y
+        c.drawString(margin, y, text)
+        y -= 0.18 * inch
+        if y < margin:
             c.showPage()
-            y = height - 50
+            y = height - margin
+
+    header(f"AI-BOM Technical File: {bom['name']} v{bom['version']}")
+    section("Summary")
+    line(f"Created at: {bom.get('created_at', '')}")
+    desc = bom.get('description', '') or ''
+    line(f"Description: {desc[:120]}")
+
+    section("Components")
+    for comp in bom.get("components", [])[:40]:
+        fp = comp.get('fingerprint', {})
+        line(f"- {comp.get('type')} {comp.get('name')} ({fp.get('algorithm','')}:{fp.get('hash','')[:12]})")
+
+    section("Compliance Report")
+    report = build_compliance_report(bom)
+    for detail in report.get('details', []):
+        line(f"{detail['control']}: {'OK' if detail['satisfied'] else 'MISSING'}")
+
     c.showPage()
     c.save()
 

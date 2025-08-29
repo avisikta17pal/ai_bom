@@ -87,11 +87,17 @@ jobs:
           python -m ai_bom.cli deploy-check
 ```
 
-### Security & privacy
+### Security & privacy (production)
 
 - Default is metadata-only: dataset content is never uploaded; only hashes and metadata are stored.
 - Use ed25519 keys; generate with `ai-bom keygen`. Consider KMS/HSM in production.
-- JWT secrets rotate via `SECRET_KEY`. Use HTTPS and secure cookies in production.
+- JWT secrets rotate via `SECRET_KEY`. Use HTTPS and secure cookies in production. Set `require_https=true` and configure ingress TLS.
+- CORS tightened via `cors_origins`. Configure to your frontend domain.
+- Security headers: HSTS, CSP, X-Frame-Options, X-Content-Type-Options.
+- Rate limiting via Redis; Prometheus metrics and OpenTelemetry tracing enabled.
+- S3 MinIO uploads use SSE (AES256) and presigned URLs.
+- Alembic migrations manage schema; audit logs are append-only via DB trigger.
+- CI adds coverage gate, Bandit SAST, Trivy image scan; Dependabot keeps dependencies current.
 
 ### Compliance mapping summary
 
@@ -108,6 +114,11 @@ See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 ### Roadmap
 
 See `ROADMAP.md` for the 4-week plan and stretch goals.
+
+### Backups
+
+- Backup DB: `scripts/db_backup.sh`
+- Restore DB: `scripts/db_restore.sh`
 
 ### License
 

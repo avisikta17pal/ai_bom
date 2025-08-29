@@ -13,6 +13,7 @@ from ai_bom.db.models import BOM, BOMVersion, Project, User
 from ai_bom.db.session import get_session
 from ai_bom.services.exporter import export_bom
 from ai_bom.services.storage import presign_put
+from ai_bom.services.audit import write_audit_log
 
 
 router = APIRouter()
@@ -85,6 +86,7 @@ async def create_bom(
     )
     session.add(version)
     await session.commit()
+    await write_audit_log(session, project_id=project_id, actor_id=user.id, entity_type="BOM", entity_id=bom.id, action="CREATE", data={"version_id": version.id})
 
     return BOMOut(
         id=version.id,

@@ -57,7 +57,7 @@ jobs:
           cd backend
           pytest --cov=ai_bom --cov-report=xml --cov-fail-under=70
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-xml
           path: backend/coverage.xml
@@ -82,7 +82,7 @@ jobs:
           image: ai-bom-backend-ci
           output-file: sbom.spdx.json
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sbom-spdx
           path: sbom.spdx.json
